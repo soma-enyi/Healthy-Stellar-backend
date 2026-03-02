@@ -1,3 +1,6 @@
+import './tracing'; // Initialize tracing before any other imports
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { VersioningType, VERSION_NEUTRAL } from '@nestjs/common';
 import { I18nValidationPipe, I18nValidationExceptionFilter } from 'nestjs-i18n';
@@ -67,8 +70,8 @@ async function bootstrap() {
     origin: corsOrigins,
     credentials: process.env.CORS_CREDENTIALS === 'true',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    exposedHeaders: ['X-Total-Count', 'X-Page-Count'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Trace-ID'],
+    exposedHeaders: ['X-Total-Count', 'X-Page-Count', 'X-Trace-ID'],
     maxAge: 3600,
   });
 

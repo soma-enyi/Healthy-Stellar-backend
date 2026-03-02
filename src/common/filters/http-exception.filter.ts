@@ -8,6 +8,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { trace, context } from '@opentelemetry/api';
 import { v4 as uuidv4 } from 'uuid';
 
 interface ErrorResponse {
@@ -99,10 +100,17 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       }
     }
 
+    // Get trace ID
+    const span = trace.getSpan(context.active());
+    const traceId = span?.spanContext().traceId || (request as any).traceId;
+
     const errorResponse = {
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
+      method: request.method,
+      message: typeof message === 'string' ? message : (message as any).message || message,
+      traceId,
     };
 
     if (details) {
@@ -112,6 +120,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     // Logging
     if (statusCode >= 500) {
       this.logger.error(
+        `[traceId: ${traceId}] ${request.method} ${request.url}`,
+        exception instanceof Error ? exception.stack : JSON.stringify(exception),
+      );
+    } else {
+      this.logger.warn(`[traceId: ${traceId}] ${request.method} ${request.url} - ${JSON.stringify(errorResponse)}`);
         `[${traceId}] ${request.method} ${request.url} - ${message}`,
         exception instanceof Error ? exception.stack : JSON.stringify(exception),
       );
