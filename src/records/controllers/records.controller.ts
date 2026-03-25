@@ -9,11 +9,14 @@ import {
   UseInterceptors,
   BadRequestException,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { RecordsService } from '../services/records.service';
+import { RecordDownloadService } from '../services/record-download.service';
 import { CreateRecordDto } from '../dto/create-record.dto';
 import { PaginationQueryDto } from '../dto/pagination-query.dto';
 import { PaginatedRecordsResponseDto } from '../dto/paginated-response.dto';
@@ -27,7 +30,10 @@ import { AdminGuard } from '../../auth/guards/admin.guard';
 @ApiTags('Records')
 @Controller('records')
 export class RecordsController {
-  constructor(private readonly recordsService: RecordsService) {}
+  constructor(
+    private readonly recordsService: RecordsService,
+    private readonly recordDownloadService: RecordDownloadService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Upload a new medical record' })
@@ -124,6 +130,38 @@ export class RecordsController {
   async findOne(@Param('id') id: string, @Req() req: any) {
     const requesterId = req.user?.userId || req.user?.id;
     return this.recordsService.findOne(id, requesterId);
+  }
+
+  @Get(':id/download')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Download and decrypt a record file' })
+  @ApiResponse({ status: 200, description: 'Decrypted file streamed to client' })
+  @ApiResponse({ status: 401, description: 'Unauthenticated' })
+  @ApiResponse({ status: 403, description: 'No active access grant' })
+  @ApiResponse({ status: 404, description: 'Record not found' })
+  async downloadRecord(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Res() res: Response,
+  ): Promise<void> {
+    const requesterId: string = req.user?.userId ?? req.user?.id;
+    const ip: string = req.ip ?? 'unknown';
+    const ua: string = req.headers['user-agent'] ?? 'unknown';
+
+    const { stream, contentType, filename } = await this.recordDownloadService.download(
+      id,
+      requesterId,
+      ip,
+      ua,
+    );
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+
+    stream.pipe(res);
   }
 
   @Get(':id/events')
