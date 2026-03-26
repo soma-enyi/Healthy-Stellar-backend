@@ -14,7 +14,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
 
 import { PatientsService } from './patients.service';
 import { PatientTimelineService } from './services/patient-timeline.service';
@@ -26,6 +26,7 @@ import { AdminGuard } from './guards/admin-guard';
 import { PatientOwnerGuard } from './guards/patient-owner.guard';
 import { SetGeoRestrictionsDto } from './dto/set-geo-restrictions.dto';
 import { GeoRestrictionGuard } from './guards/geo-restriction.guard';
+import { PaginationDto } from '../common/dto/pagination.dto';
 
 @ApiTags('patients')
 @Controller('patients')
@@ -51,8 +52,10 @@ export class PatientsController {
   @Get('/admin/all/')
   @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Get all patients (admin only)' })
-  async getPatient() {
-    return this.patientsService.findAll();
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'pageSize', required: false, type: Number, example: 20 })
+  async getPatient(@Query() paginationDto: PaginationDto) {
+    return this.patientsService.findAll(paginationDto);
   }
 
   @Get()
@@ -73,10 +76,7 @@ export class PatientsController {
   @ApiParam({ name: 'address', description: 'Patient ID (Stellar address)' })
   @ApiResponse({ status: 200, description: 'Geo-restrictions updated' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  async setGeoRestrictions(
-    @Param('address') address: string,
-    @Body() dto: SetGeoRestrictionsDto,
-  ) {
+  async setGeoRestrictions(@Param('address') address: string, @Body() dto: SetGeoRestrictionsDto) {
     return this.patientsService.setGeoRestrictions(address, dto.allowedCountries);
   }
 
@@ -103,10 +103,7 @@ export class PatientsController {
    */
   @Patch(':address/profile')
   @UseGuards(PatientOwnerGuard)
-  async updateProfile(
-    @Param('address') address: string,
-    @Body() dto: UpdatePatientProfileDto,
-  ) {
+  async updateProfile(@Param('address') address: string, @Body() dto: UpdatePatientProfileDto) {
     return this.patientsService.updateProfile(address, dto);
   }
 
